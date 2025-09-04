@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Save, Shield, Mail, Database, AlertTriangle } from 'lucide-react';
+import { Save, Shield, Mail, Database, AlertTriangle, MessageCircle, CheckCircle, XCircle } from 'lucide-react';
 
 import { notificationService } from '../../services/notificationService';
+import { emailJSService } from '../../services/emailConfig';
 
 const SystemSettings: React.FC = () => {
   const [settings, setSettings] = useState({
@@ -17,6 +18,17 @@ const SystemSettings: React.FC = () => {
     auditRetentionDays: 90
   });
   const [isSaved, setIsSaved] = useState(false);
+  const [emailJSStatus, setEmailJSStatus] = useState<{
+    isConfigured: boolean;
+    missingFields: string[];
+    serviceId: string;
+  } | null>(null);
+
+  useEffect(() => {
+    // Check EmailJS configuration status
+    const status = emailJSService.getConfigurationStatus();
+    setEmailJSStatus(status);
+  }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
@@ -36,11 +48,19 @@ const SystemSettings: React.FC = () => {
   };
 
   const handleTestEmail = async () => {
-    const result = await notificationService.testEmailService();
-    if (result.success) {
-      alert('✅ Email test successful! Check the browser console for details.');
+    // Test EmailJS configuration first
+    const emailJSTest = await emailJSService.testConfiguration();
+    
+    if (emailJSTest.success) {
+      alert('✅ EmailJS test successful! Real emails can be sent.');
     } else {
-      alert(`❌ Email test failed: ${result.message}`);
+      // Fallback to notification service simulation
+      const result = await notificationService.testEmailService();
+      if (result.success) {
+        alert('✅ Email test successful (simulated)! Configure EmailJS for real delivery.\n\nCheck the browser console for details.');
+      } else {
+        alert(`❌ Email test failed: ${result.message}`);
+      }
     }
   };
 
@@ -214,6 +234,53 @@ const SystemSettings: React.FC = () => {
           <h3 className="text-lg font-medium text-gray-900">Email & Notifications</h3>
         </div>
 
+        {/* EmailJS Configuration Status */}
+        {emailJSStatus && (
+          <div className={`mb-6 p-4 rounded-md border ${
+            emailJSStatus.isConfigured 
+              ? 'bg-green-50 border-green-200' 
+              : 'bg-yellow-50 border-yellow-200'
+          }`}>
+            <div className="flex items-center">
+              {emailJSStatus.isConfigured ? (
+                <CheckCircle className="h-5 w-5 text-green-400" />
+              ) : (
+                <AlertTriangle className="h-5 w-5 text-yellow-400" />
+              )}
+              <div className="ml-3">
+                <h3 className={`text-sm font-medium ${
+                  emailJSStatus.isConfigured ? 'text-green-800' : 'text-yellow-800'
+                }`}>
+                  EmailJS Configuration Status
+                </h3>
+                <div className={`mt-2 text-sm ${
+                  emailJSStatus.isConfigured ? 'text-green-700' : 'text-yellow-700'
+                }`}>
+                  <p><strong>Service ID:</strong> {emailJSStatus.serviceId}</p>
+                  {emailJSStatus.isConfigured ? (
+                    <p>✅ EmailJS is properly configured and ready to send real emails.</p>
+                  ) : (
+                    <div>
+                      <p>⚠️ Missing configuration fields: {emailJSStatus.missingFields.join(', ')}</p>
+                      <p className="mt-1">
+                        Please update the configuration in <code>src/services/emailConfig.ts</code>:
+                      </p>
+                      <ul className="list-disc list-inside mt-1 space-y-1">
+                        {emailJSStatus.missingFields.includes('Public Key') && (
+                          <li>Set your EmailJS public key</li>
+                        )}
+                        {emailJSStatus.missingFields.includes('Template ID') && (
+                          <li>Set your EmailJS template ID</li>
+                        )}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="space-y-4">
           <div className="flex items-center">
             <input
@@ -280,6 +347,21 @@ const SystemSettings: React.FC = () => {
             Test WhatsApp Service
           </button>
 
+          <button 
+            onClick={async () => {
+              const test = await emailJSService.testConfiguration();
+              if (test.success) {
+                alert('✅ EmailJS configuration test passed! Service is ready to send real emails.');
+              } else {
+                alert(`❌ EmailJS configuration test failed: ${test.message}`);
+              }
+            }}
+            className="flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+          >
+            <Mail className="w-4 h-4 mr-2" />
+            Test EmailJS Config
+          </button>
+
           <button className="flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
             <Database className="w-4 h-4 mr-2" />
             Backup Database
@@ -302,12 +384,13 @@ const SystemSettings: React.FC = () => {
             <AlertTriangle className="h-5 w-5 text-yellow-400" />
             <div className="ml-3">
               <h3 className="text-sm font-medium text-yellow-800">
-                Maintenance Notice
+                Configuration Notice
               </h3>
               <div className="mt-2 text-sm text-yellow-700">
                 <p>
-                  System maintenance operations should be performed during off-peak hours. 
-                  Always ensure you have a recent backup before making changes.
+                  To enable real email delivery, please configure your EmailJS credentials in 
+                  <code className="bg-yellow-100 px-1 rounded">src/services/emailConfig.ts</code>.
+                  Your service ID <code className="bg-yellow-100 px-1 rounded">service_aafmmyo</code> is already configured.
                 </p>
               </div>
             </div>

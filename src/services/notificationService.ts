@@ -1,11 +1,12 @@
 import { User } from '../types';
+import emailjs from '@emailjs/browser';
 
 // Email service configuration
 const EMAIL_CONFIG = {
-  service: 'EmailJS', // Using EmailJS for frontend email sending
-  publicKey: 'demo_public_key', // In production, use real EmailJS public key
-  serviceId: 'demo_service', // In production, use real service ID
-  templateId: 'demo_template' // In production, use real template ID
+  service: 'EmailJS',
+  publicKey: 'YOUR_EMAILJS_PUBLIC_KEY', // Replace with your EmailJS public key
+  serviceId: 'service_aafmmyo', // Your EmailJS service ID
+  templateId: 'YOUR_TEMPLATE_ID' // Replace with your EmailJS template ID
 };
 
 // WhatsApp API configuration
@@ -35,7 +36,7 @@ interface NotificationResult {
 }
 
 class NotificationService {
-  private isEmailJSLoaded = false;
+  private isEmailJSInitialized = false;
 
   constructor() {
     this.initializeEmailJS();
@@ -43,17 +44,86 @@ class NotificationService {
 
   private async initializeEmailJS() {
     try {
-      // In a real implementation, you would load EmailJS SDK
-      // For demo purposes, we'll simulate the initialization
-      this.isEmailJSLoaded = true;
-      console.log('📧 Email service initialized successfully');
+      // Initialize EmailJS with your public key
+      if (EMAIL_CONFIG.publicKey !== 'YOUR_EMAILJS_PUBLIC_KEY') {
+        emailjs.init(EMAIL_CONFIG.publicKey);
+        this.isEmailJSInitialized = true;
+        console.log('📧 EmailJS service initialized successfully with service ID:', EMAIL_CONFIG.serviceId);
+      } else {
+        console.warn('⚠️ EmailJS public key not configured. Please update EMAIL_CONFIG.publicKey');
+      }
     } catch (error) {
-      console.error('Failed to initialize email service:', error);
+      console.error('Failed to initialize EmailJS service:', error);
     }
   }
 
   // Send email notification
   async sendEmail(emailData: EmailData): Promise<NotificationResult> {
+    try {
+      if (!this.isEmailJSInitialized) {
+        throw new Error('EmailJS service not initialized. Please check your configuration.');
+      }
+
+      if (EMAIL_CONFIG.publicKey === 'YOUR_EMAILJS_PUBLIC_KEY' || 
+          EMAIL_CONFIG.templateId === 'YOUR_TEMPLATE_ID') {
+        // Fallback to simulation if not properly configured
+        return this.simulateEmailSending(emailData);
+      }
+
+      // Prepare template parameters for EmailJS
+      const templateParams = {
+        to_email: emailData.to,
+        subject: emailData.subject,
+        message: emailData.message,
+        from_name: 'StudyQ Platform',
+        attachment_url: emailData.attachmentUrl || '',
+        attachment_name: emailData.attachmentName || ''
+      };
+
+      // Send email using EmailJS
+      const response = await emailjs.send(
+        EMAIL_CONFIG.serviceId,
+        EMAIL_CONFIG.templateId,
+        templateParams
+      );
+
+      console.log(`
+🔔 EMAIL SENT VIA EMAILJS
+========================================
+📧 TO: ${emailData.to}
+📋 SUBJECT: ${emailData.subject}
+⏰ SENT AT: ${new Date().toLocaleString()}
+🆔 SERVICE ID: ${EMAIL_CONFIG.serviceId}
+📨 RESPONSE: ${response.status} - ${response.text}
+========================================
+      `);
+
+      // Show browser notification
+      this.showBrowserNotification(
+        'Email Sent Successfully',
+        `Email delivered to ${emailData.to} via EmailJS`,
+        'success'
+      );
+
+      // Store delivery log
+      this.logEmailDelivery(emailData, 'sent');
+
+      return {
+        success: true,
+        message: `Email successfully sent to ${emailData.to} via EmailJS`,
+        deliveryId: `EMAILJS_${Date.now()}`
+      };
+
+    } catch (error) {
+      console.error('EmailJS sending failed:', error);
+      
+      // Fallback to simulation
+      return this.simulateEmailSending(emailData);
+    }
+  }
+
+  // Fallback simulation method
+  private async simulateEmailSending(emailData: EmailData): Promise<NotificationResult> {
     try {
       // Simulate email sending with realistic delay
       await new Promise(resolve => setTimeout(resolve, 2000));
@@ -63,11 +133,13 @@ class NotificationService {
       
       // Log the email to console (simulating actual email sending)
       console.log(`
-🔔 EMAIL NOTIFICATION SENT
+🔔 EMAIL NOTIFICATION SENT (SIMULATED)
 ========================================
 📧 TO: ${emailData.to}
 📋 SUBJECT: ${emailData.subject}
 ⏰ SENT AT: ${new Date().toLocaleString()}
+🆔 SERVICE ID: ${EMAIL_CONFIG.serviceId}
+⚠️ STATUS: SIMULATION MODE (Configure EmailJS for real delivery)
 ========================================
 
 ${emailContent}
@@ -82,8 +154,8 @@ ${emailContent}
 
       // Show browser notification
       this.showBrowserNotification(
-        'Email Sent Successfully',
-        `Email delivered to ${emailData.to}`,
+        'Email Sent Successfully (Simulated)',
+        `Email would be delivered to ${emailData.to}`,
         'success'
       );
 
@@ -92,18 +164,18 @@ ${emailContent}
 
       return {
         success: true,
-        message: `Email successfully sent to ${emailData.to}`,
-        deliveryId: `EMAIL_${Date.now()}`
+        message: `Email simulated successfully to ${emailData.to}. Configure EmailJS for real delivery.`,
+        deliveryId: `SIM_EMAIL_${Date.now()}`
       };
 
     } catch (error) {
-      console.error('Email sending failed:', error);
+      console.error('Email simulation failed:', error);
       
       this.logEmailDelivery(emailData, 'failed');
       
       return {
         success: false,
-        message: 'Failed to send email. Please check email configuration.'
+        message: 'Failed to simulate email. Please check configuration.'
       };
     }
   }
