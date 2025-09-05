@@ -1,75 +1,67 @@
-import React, { useState } from 'react';
-import { X, Loader2 } from 'lucide-react';
-import { User } from '../../types';
-import { saveUser } from '../../utils/auth';
-import { logAuditEvent } from '../../utils/audit';
-import { useAuth } from '../../contexts/AuthContext';
+import React, { useState } from 'react'
+import { X, Loader2 } from 'lucide-react'
+import { AuthUser } from '../../services/authService'
+import { userService } from '../../services/userService'
 
 interface EditUserModalProps {
-  isOpen: boolean;
-  user: User;
-  onClose: () => void;
-  onUserUpdated: () => void;
+  isOpen: boolean
+  user: AuthUser
+  onClose: () => void
+  onUserUpdated: () => void
 }
 
 const EditUserModal: React.FC<EditUserModalProps> = ({ isOpen, user, onClose, onUserUpdated }) => {
-  const { user: currentUser } = useAuth();
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState('')
   const [formData, setFormData] = useState({
-    firstName: user.firstName,
-    lastName: user.lastName,
+    name: user.name,
     email: user.email,
-    academicYear: user.academicYear || new Date().getFullYear(),
-    currentSemester: user.currentSemester || 1,
-    whatsappNumber: user.whatsappNumber || ''
-  });
+    whatsapp_number: user.whatsapp_number || '',
+    academic_year: user.academic_year || new Date().getFullYear(),
+    current_semester: user.current_semester || 1
+  })
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
+    const { name, value } = e.target
     setFormData(prev => ({
       ...prev,
-      [name]: name === 'academicYear' || name === 'currentSemester' ? parseInt(value) : value
-    }));
-  };
+      [name]: name === 'academic_year' || name === 'current_semester' ? parseInt(value) : value
+    }))
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
+    e.preventDefault()
+    setError('')
+    setIsLoading(true)
 
     try {
-      const updatedUser: User = {
-        ...user,
-        firstName: formData.firstName,
-        lastName: formData.lastName,
+      const updates = {
+        name: formData.name,
         email: formData.email,
+        whatsapp_number: formData.whatsapp_number || undefined,
         ...(user.role === 'student' && {
-          academicYear: formData.academicYear,
-          currentSemester: formData.currentSemester,
-          whatsappNumber: formData.whatsappNumber
+          academic_year: formData.academic_year,
+          current_semester: formData.current_semester
         })
-      };
-
-      saveUser(updatedUser);
-
-      if (currentUser) {
-        logAuditEvent(
-          currentUser.id,
-          `${currentUser.firstName} ${currentUser.lastName}`,
-          'USER_UPDATE',
-          `Updated user: ${formData.firstName} ${formData.lastName} (${user.username})`
-        );
       }
 
-      onUserUpdated();
-      onClose();
-    } catch (error) {
-      console.error('Error updating user:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+      const result = await userService.updateUser(user.user_id, updates)
 
-  if (!isOpen) return null;
+      if (result.success) {
+        onUserUpdated()
+        onClose()
+      } else {
+        setError(result.error || 'Failed to update user')
+      }
+    } catch (error) {
+      console.error('Error updating user:', error)
+      setError('Failed to update user. Please try again.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  if (!isOpen) return null
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
@@ -87,33 +79,24 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ isOpen, user, onClose, on
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  First Name *
-                </label>
-                <input
-                  type="text"
-                  name="firstName"
-                  value={formData.firstName}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  required
-                />
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">
+                {error}
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Last Name *
-                </label>
-                <input
-                  type="text"
-                  name="lastName"
-                  value={formData.lastName}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  required
-                />
-              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Full Name *
+              </label>
+              <input
+                type="text"
+                name="name"
+                value={formData.name}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                required
+              />
             </div>
 
             <div>
@@ -130,58 +113,56 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ isOpen, user, onClose, on
               />
             </div>
 
-            {user.role === 'student' && (
-              <>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Academic Year *
-                    </label>
-                    <select
-                      name="academicYear"
-                      value={formData.academicYear}
-                      onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      required
-                    >
-                      {[...Array(5)].map((_, i) => {
-                        const year = new Date().getFullYear() - 2 + i;
-                        return <option key={year} value={year}>{year}</option>;
-                      })}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Current Semester *
-                    </label>
-                    <select
-                      name="currentSemester"
-                      value={formData.currentSemester}
-                      onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      required
-                    >
-                      {[...Array(8)].map((_, i) => (
-                        <option key={i + 1} value={i + 1}>Semester {i + 1}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                WhatsApp Number
+              </label>
+              <input
+                type="tel"
+                name="whatsapp_number"
+                value={formData.whatsapp_number}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="+1234567890"
+              />
+            </div>
 
+            {user.role === 'student' && (
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    WhatsApp Number
+                    Academic Year *
                   </label>
-                  <input
-                    type="tel"
-                    name="whatsappNumber"
-                    value={formData.whatsappNumber}
+                  <select
+                    name="academic_year"
+                    value={formData.academic_year}
                     onChange={handleInputChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="+1234567890"
-                  />
+                    required
+                  >
+                    {[...Array(5)].map((_, i) => {
+                      const year = new Date().getFullYear() - 2 + i
+                      return <option key={year} value={year}>{year}</option>
+                    })}
+                  </select>
                 </div>
-              </>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Current Semester *
+                  </label>
+                  <select
+                    name="current_semester"
+                    value={formData.current_semester}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    required
+                  >
+                    {[...Array(8)].map((_, i) => (
+                      <option key={i + 1} value={i + 1}>Semester {i + 1}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
             )}
 
             <div className="flex justify-end space-x-3 pt-4">
@@ -212,7 +193,7 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ isOpen, user, onClose, on
         </div>
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default EditUserModal;
+export default EditUserModal

@@ -1,78 +1,91 @@
-import React, { useState } from 'react';
-import { X, Eye, EyeOff, Loader2, Check } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
-import { PasswordChangeData } from '../../types';
-import { validatePasswordStrength } from '../../utils/auth';
+import React, { useState } from 'react'
+import { X, Eye, EyeOff, Loader2, Check } from 'lucide-react'
+import { useAuth } from '../../contexts/AuthContext'
 
 interface PasswordChangeModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  isForced?: boolean;
+  isOpen: boolean
+  onClose: () => void
+  isForced?: boolean
 }
 
 const PasswordChangeModal: React.FC<PasswordChangeModalProps> = ({ isOpen, onClose, isForced = false }) => {
-  const { updatePassword } = useAuth();
-  const [passwordData, setPasswordData] = useState<PasswordChangeData>({
+  const { changePassword } = useAuth()
+  const [passwordData, setPasswordData] = useState({
     currentPassword: '',
     newPassword: '',
     confirmPassword: ''
-  });
+  })
   const [showPasswords, setShowPasswords] = useState({
     current: false,
     new: false,
     confirm: false
-  });
-  const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  })
+  const [error, setError] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
 
-  const passwordValidation = validatePasswordStrength(passwordData.newPassword);
+  const validatePassword = (password: string) => {
+    const requirements = [
+      { test: password.length >= 8, text: 'At least 8 characters' },
+      { test: /[a-z]/.test(password), text: 'One lowercase letter' },
+      { test: /[A-Z]/.test(password), text: 'One uppercase letter' },
+      { test: /\d/.test(password), text: 'One number' },
+      { test: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password), text: 'One special character' }
+    ]
+    
+    return {
+      isValid: requirements.every(req => req.test),
+      requirements
+    }
+  }
+
+  const passwordValidation = validatePassword(passwordData.newPassword)
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
+    e.preventDefault()
+    setError('')
 
     if (!passwordValidation.isValid) {
-      setError(passwordValidation.errors[0]);
-      return;
+      setError('Password does not meet requirements')
+      return
     }
 
     if (passwordData.newPassword !== passwordData.confirmPassword) {
-      setError('New passwords do not match');
-      return;
+      setError('New passwords do not match')
+      return
     }
 
-    setIsLoading(true);
+    setIsLoading(true)
 
     try {
-      const result = await updatePassword(passwordData);
+      const result = await changePassword(passwordData.currentPassword, passwordData.newPassword)
       if (result.success) {
-        onClose();
+        onClose()
         setPasswordData({
           currentPassword: '',
           newPassword: '',
           confirmPassword: ''
-        });
+        })
       } else {
-        setError(result.error || 'Failed to update password');
+        setError(result.error || 'Failed to update password')
       }
     } catch (err) {
-      setError('An unexpected error occurred');
+      setError('An unexpected error occurred')
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
-  };
+  }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setPasswordData(prev => ({ ...prev, [name]: value }));
-    setError('');
-  };
+    const { name, value } = e.target
+    setPasswordData(prev => ({ ...prev, [name]: value }))
+    setError('')
+  }
 
   const togglePasswordVisibility = (field: 'current' | 'new' | 'confirm') => {
-    setShowPasswords(prev => ({ ...prev, [field]: !prev[field] }));
-  };
+    setShowPasswords(prev => ({ ...prev, [field]: !prev[field] }))
+  }
 
-  if (!isOpen) return null;
+  if (!isOpen) return null
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
@@ -169,13 +182,7 @@ const PasswordChangeModal: React.FC<PasswordChangeModalProps> = ({ isOpen, onClo
                 <div className="mt-2 space-y-1">
                   <div className="text-xs text-gray-600">Password requirements:</div>
                   <div className="space-y-1">
-                    {[
-                      { test: passwordData.newPassword.length >= 8, text: 'At least 8 characters' },
-                      { test: /[a-z]/.test(passwordData.newPassword), text: 'One lowercase letter' },
-                      { test: /[A-Z]/.test(passwordData.newPassword), text: 'One uppercase letter' },
-                      { test: /\d/.test(passwordData.newPassword), text: 'One number' },
-                      { test: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(passwordData.newPassword), text: 'One special character' }
-                    ].map((req, index) => (
+                    {passwordValidation.requirements.map((req, index) => (
                       <div key={index} className={`flex items-center text-xs ${req.test ? 'text-green-600' : 'text-gray-500'}`}>
                         <Check className={`w-3 h-3 mr-1 ${req.test ? 'text-green-600' : 'text-gray-300'}`} />
                         {req.text}
@@ -246,7 +253,7 @@ const PasswordChangeModal: React.FC<PasswordChangeModalProps> = ({ isOpen, onClo
         </div>
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default PasswordChangeModal;
+export default PasswordChangeModal

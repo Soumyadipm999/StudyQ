@@ -1,124 +1,120 @@
-import React, { useState } from 'react';
-import { X, Loader2, Mail, Eye, EyeOff } from 'lucide-react';
-import { User } from '../../types';
-import { generateUserId, generateTemporaryPassword, saveUser, sendLoginCredentials } from '../../utils/auth';
-import { logAuditEvent } from '../../utils/audit';
-import { useAuth } from '../../contexts/AuthContext';
-
-import { notificationService } from '../../services/notificationService';
+import React, { useState } from 'react'
+import { X, Loader2, Mail, Eye, EyeOff } from 'lucide-react'
+import { userService } from '../../services/userService'
+import { notificationService } from '../../services/notificationService'
 
 interface CreateUserModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onUserCreated: () => void;
+  isOpen: boolean
+  onClose: () => void
+  onUserCreated: () => void
 }
 
 const CreateUserModal: React.FC<CreateUserModalProps> = ({ isOpen, onClose, onUserCreated }) => {
-  const { user: currentUser } = useAuth();
-  const [isLoading, setIsLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+  const [error, setError] = useState('')
   const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
+    name: '',
     email: '',
     role: 'student' as 'teacher' | 'student',
-    academicYear: new Date().getFullYear(),
-    currentSemester: 1
-  });
+    whatsapp_number: '',
+    academic_year: new Date().getFullYear(),
+    current_semester: 1
+  })
   const [generatedCredentials, setGeneratedCredentials] = useState<{
-    username: string;
-    password: string;
-  } | null>(null);
+    username: string
+    password: string
+  } | null>(null)
+
+  const resetForm = () => {
+    setFormData({
+      name: '',
+      email: '',
+      role: 'student',
+      whatsapp_number: '',
+      academic_year: new Date().getFullYear(),
+      current_semester: 1
+    })
+    setGeneratedCredentials(null)
+    setError('')
+  }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
+    const { name, value } = e.target
     setFormData(prev => ({
       ...prev,
-      [name]: name === 'academicYear' || name === 'currentSemester' ? parseInt(value) : value
-    }));
-  };
+      [name]: name === 'academic_year' || name === 'current_semester' ? parseInt(value) : value
+    }))
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
+    e.preventDefault()
+    setError('')
+    setIsLoading(true)
 
     try {
-      // Generate credentials
-      const userId = generateUserId(formData.role);
-      const username = `${formData.firstName.toLowerCase()}.${formData.lastName.toLowerCase()}`;
-      const password = generateTemporaryPassword();
-
-      const newUser: User = {
-        id: userId,
-        username,
+      const userData = {
+        name: formData.name,
         email: formData.email,
         role: formData.role,
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        isActive: true,
-        createdAt: new Date().toISOString(),
-        mustChangePassword: true,
-        failedLoginAttempts: 0,
-        tempPassword: password, // Store temporary password for demo authentication
+        whatsapp_number: formData.whatsapp_number || undefined,
         ...(formData.role === 'student' && {
-          academicYear: formData.academicYear,
-          currentSemester: formData.currentSemester,
-          whatsappNumber: ''
+          academic_year: formData.academic_year,
+          current_semester: formData.current_semester
         })
-      };
-
-      saveUser(newUser);
-      setGeneratedCredentials({ username, password });
-
-      if (currentUser) {
-        logAuditEvent(
-          currentUser.id,
-          `${currentUser.firstName} ${currentUser.lastName}`,
-          'USER_CREATE',
-          `Created new ${formData.role}: ${formData.firstName} ${formData.lastName} (${username})`
-        );
       }
 
-      onUserCreated();
-    } catch (error) {
-      console.error('Error creating user:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+      const result = await userService.createUser(userData)
 
-  const handleSendCredentials = () => {
-    if (generatedCredentials) {
-      // Create a user object for the email function
-      const userForEmail: User = {
-        id: 'temp-id',
-        username: generatedCredentials.username,
-        email: formData.email,
-        role: formData.role,
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        isActive: true,
-        createdAt: new Date().toISOString(),
-        mustChangePassword: true,
-        failedLoginAttempts: 0,
-        ...(formData.role === 'student' && {
-          academicYear: formData.academicYear,
-          currentSemester: formData.currentSemester
+      if (result.success && result.user && result.tempPassword) {
+        setGeneratedCredentials({
+          username: result.user.name,
+          password: result.tempPassword
         })
-      };
-      
-      notificationService.sendLoginCredentials(userForEmail, generatedCredentials.password).then((result) => {
-        if (result.success) {
-          alert(`${result.message}\n\nCheck the browser console to see the detailed email content.`);
-          onClose();
-        } else {
-          alert(`Failed to send email: ${result.message}\n\nPlease provide the credentials manually:\nUsername: ${generatedCredentials.username}\nPassword: ${generatedCredentials.password}`);
-        }
-      });
+        onUserCreated()
+      } else {
+        setError(result.error || 'Failed to create user')
+      }
+    } catch (error) {
+      console.error('Error creating user:', error)
+      setError('Failed to create user. Please try again.')
+    } finally {
+      setIsLoading(false)
     }
-  };
+  }
 
-  if (!isOpen) return null;
+  const handleSendCredentials = async () => {
+    if (generatedCredentials && formData.email) {
+      try {
+        const userForEmail = {
+          firstName: formData.name.split(' ')[0],
+          lastName: formData.name.split(' ').slice(1).join(' ') || '',
+          email: formData.email,
+          role: formData.role,
+          username: generatedCredentials.username,
+          ...(formData.role === 'student' && {
+            academicYear: formData.academic_year,
+            currentSemester: formData.current_semester
+          })
+        }
+        
+        const result = await notificationService.sendLoginCredentials(userForEmail as any, generatedCredentials.password)
+        
+        if (result.success) {
+          alert(`${result.message}\n\nCheck the browser console to see the detailed email content.`)
+          resetForm()
+          onClose()
+        } else {
+          alert(`Failed to send email: ${result.message}\n\nPlease provide the credentials manually:\nUsername: ${generatedCredentials.username}\nPassword: ${generatedCredentials.password}`)
+        }
+      } catch (error) {
+        console.error('Error sending credentials:', error)
+        alert('Failed to send credentials email. Please provide them manually.')
+      }
+    }
+  }
+
+  if (!isOpen) return null
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
@@ -132,7 +128,7 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({ isOpen, onClose, onUs
             <h3 className="text-lg font-medium text-gray-900">
               {generatedCredentials ? 'User Created Successfully' : 'Create New User'}
             </h3>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
+            <button onClick={() => { resetForm(); onClose() }} className="text-gray-400 hover:text-gray-600 transition-colors">
               <X className="w-5 h-5" />
             </button>
           </div>
@@ -168,7 +164,7 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({ isOpen, onClose, onUs
 
               <div className="flex justify-end space-x-3">
                 <button
-                  onClick={onClose}
+                  onClick={() => { resetForm(); onClose() }}
                   className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
                 >
                   Done
@@ -184,33 +180,25 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({ isOpen, onClose, onUs
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    First Name *
-                  </label>
-                  <input
-                    type="text"
-                    name="firstName"
-                    value={formData.firstName}
-                    onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    required
-                  />
+              {error && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">
+                  {error}
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Last Name *
-                  </label>
-                  <input
-                    type="text"
-                    name="lastName"
-                    value={formData.lastName}
-                    onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    required
-                  />
-                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Full Name *
+                </label>
+                <input
+                  type="text"
+                  name="name"
+                  value={formData.name}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  required
+                  placeholder="Enter full name"
+                />
               </div>
 
               <div>
@@ -224,6 +212,7 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({ isOpen, onClose, onUs
                   onChange={handleInputChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   required
+                  placeholder="Enter email address"
                 />
               </div>
 
@@ -243,6 +232,20 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({ isOpen, onClose, onUs
                 </select>
               </div>
 
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  WhatsApp Number
+                </label>
+                <input
+                  type="tel"
+                  name="whatsapp_number"
+                  value={formData.whatsapp_number}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="+1234567890"
+                />
+              </div>
+
               {formData.role === 'student' && (
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -250,15 +253,15 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({ isOpen, onClose, onUs
                       Academic Year *
                     </label>
                     <select
-                      name="academicYear"
-                      value={formData.academicYear}
+                      name="academic_year"
+                      value={formData.academic_year}
                       onChange={handleInputChange}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       required
                     >
                       {[...Array(5)].map((_, i) => {
-                        const year = new Date().getFullYear() - 2 + i;
-                        return <option key={year} value={year}>{year}</option>;
+                        const year = new Date().getFullYear() - 2 + i
+                        return <option key={year} value={year}>{year}</option>
                       })}
                     </select>
                   </div>
@@ -267,8 +270,8 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({ isOpen, onClose, onUs
                       Current Semester *
                     </label>
                     <select
-                      name="currentSemester"
-                      value={formData.currentSemester}
+                      name="current_semester"
+                      value={formData.current_semester}
                       onChange={handleInputChange}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       required
@@ -284,7 +287,7 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({ isOpen, onClose, onUs
               <div className="flex justify-end space-x-3 pt-4">
                 <button
                   type="button"
-                  onClick={onClose}
+                  onClick={() => { resetForm(); onClose() }}
                   className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
                   disabled={isLoading}
                 >
@@ -310,7 +313,7 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({ isOpen, onClose, onUs
         </div>
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default CreateUserModal;
+export default CreateUserModal

@@ -1,37 +1,36 @@
-import React, { useState } from 'react';
-import { Eye, EyeOff, BookOpen, Loader2 } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
-import { LoginCredentials } from '../../types';
+import React, { useState } from 'react'
+import { Eye, EyeOff, BookOpen, Loader2 } from 'lucide-react'
+import { useAuth } from '../../contexts/AuthContext'
 
 const LoginForm: React.FC = () => {
-  const { login, isLoading } = useAuth();
-  const [credentials, setCredentials] = useState<LoginCredentials>({
+  const { login, isLoading } = useAuth()
+  const [credentials, setCredentials] = useState({
     username: '',
     password: ''
-  });
-  const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
+  })
+  const [showPassword, setShowPassword] = useState(false)
+  const [error, setError] = useState('')
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
+    e.preventDefault()
+    setError('')
 
     if (!credentials.username.trim() || !credentials.password.trim()) {
-      setError('Please enter both username and password');
-      return;
+      setError('Please enter both username and password')
+      return
     }
 
-    const result = await login(credentials);
+    const result = await login(credentials)
     if (!result.success) {
-      setError(result.error || 'Login failed');
+      setError(result.error || 'Login failed')
     }
-  };
+  }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setCredentials(prev => ({ ...prev, [name]: value }));
-    setError(''); // Clear error when user starts typing
-  };
+    const { name, value } = e.target
+    setCredentials(prev => ({ ...prev, [name]: value }))
+    setError('') // Clear error when user starts typing
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 px-4 sm:px-6 lg:px-8">
@@ -43,8 +42,8 @@ const LoginForm: React.FC = () => {
               <BookOpen className="w-8 h-8 text-white" />
             </div>
           </div>
-          <h2 className="mt-6 text-3xl font-bold text-gray-900">StudyPlatform</h2>
-          <p className="mt-2 text-sm text-gray-600">StudyQ - Smart Study Material Platform</p>
+          <h2 className="mt-6 text-3xl font-bold text-gray-900">StudyQ Platform</h2>
+          <p className="mt-2 text-sm text-gray-600">Smart Study Material Management System</p>
         </div>
 
         {/* Login Form */}
@@ -125,34 +124,26 @@ const LoginForm: React.FC = () => {
             <div className="space-y-2 text-xs text-gray-600">
               <div className="flex justify-between">
                 <span className="font-medium">Admin:</span>
-                <span>admin / admin123</span>
+                <span>System Administrator / admin123</span>
               </div>
               <div className="flex justify-between">
                 <span className="font-medium">Teacher:</span>
-                <span>prof.smith / teacher123</span>
+                <span>John Smith / teacher123</span>
               </div>
               <div className="flex justify-between">
                 <span className="font-medium">Student:</span>
-                <span>john.doe / student123 (Sem 3)</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="font-medium">Student 2:</span>
-                <span>jane.smith / student123 (Sem 5)</span>
-              </div>
-              <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded">
-                <p className="font-medium text-yellow-800">For newly created users:</p>
-                <p className="text-yellow-700">Use the temporary password provided when the user was created.</p>
+                <span>John Doe / student123</span>
               </div>
             </div>
             <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700">
-              <p className="font-medium mb-1">📧 Email Notifications:</p>
-              <p>When credentials are sent, check the browser console to see the simulated email content.</p>
+              <p className="font-medium mb-1">🔗 Supabase Integration:</p>
+              <p>This platform now uses Supabase for secure database operations and real-time authentication.</p>
             </div>
           </div>
         </div>
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default LoginForm;
+export default LoginForm
