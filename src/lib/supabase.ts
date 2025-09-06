@@ -3,17 +3,28 @@ import { createClient } from '@supabase/supabase-js'
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables. Please check your .env file.')
-}
+// Create a default client that can be used even without environment variables
+// This allows the app to start and show a connection prompt
+const defaultUrl = 'https://placeholder.supabase.co'
+const defaultKey = 'placeholder-key'
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+export const supabase = createClient(
+  supabaseUrl || defaultUrl, 
+  supabaseAnonKey || defaultKey, 
+  {
   auth: {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: true
   }
 })
+
+// Helper function to check if Supabase is properly configured
+export const isSupabaseConfigured = () => {
+  return !!(supabaseUrl && supabaseAnonKey && 
+           supabaseUrl !== 'your_supabase_project_url' && 
+           supabaseAnonKey !== 'your_supabase_anon_key')
+}
 
 // Database helper functions
 export const db = {

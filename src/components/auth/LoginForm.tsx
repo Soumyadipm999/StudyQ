@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { Eye, EyeOff, BookOpen, Loader2 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
+import { isSupabaseConfigured } from '../../lib/supabase'
 
 const LoginForm: React.FC = () => {
   const { login, isLoading } = useAuth()
@@ -10,6 +11,9 @@ const LoginForm: React.FC = () => {
   })
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
+
+  // Check if Supabase is configured
+  const supabaseConfigured = isSupabaseConfigured()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -52,6 +56,13 @@ const LoginForm: React.FC = () => {
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">
                 {error}
+              </div>
+            )}
+
+            {!supabaseConfigured && (
+              <div className="bg-amber-50 border border-amber-200 text-amber-700 px-4 py-3 rounded-md text-sm">
+                <p className="font-medium mb-1">⚠️ Database Not Connected</p>
+                <p>Please click "Connect to Supabase" in the top right to set up your database connection.</p>
               </div>
             )}
 

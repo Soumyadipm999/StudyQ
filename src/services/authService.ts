@@ -1,4 +1,5 @@
 import { supabase, db } from '../lib/supabase'
+import { isSupabaseConfigured } from '../lib/supabase'
 import bcrypt from 'bcryptjs'
 
 export interface LoginCredentials {
@@ -93,6 +94,14 @@ class AuthService {
     token?: string
     error?: string
   }> {
+    // Check if Supabase is configured
+    if (!isSupabaseConfigured()) {
+      return { 
+        success: false, 
+        error: 'Database not configured. Please connect to Supabase first.' 
+      }
+    }
+
     try {
       // Get user by username (stored as 'name' in database)
       const user = await db.getUserByUsername(credentials.username)
